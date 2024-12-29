@@ -58,9 +58,7 @@ Note :
     this is what i thinking
 
 
-## Dependencies
 
-- 
 
 ## LICENSE
 
@@ -85,6 +83,6 @@ MIT
 
 .
 
-    Project : EpubLib https://github.com/aerkalov/ebooklib
+    Project : EbookLib https://github.com/aerkalov/ebooklib
     to generate epub from downloaded images
 
