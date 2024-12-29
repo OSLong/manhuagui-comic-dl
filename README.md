@@ -20,9 +20,7 @@ conda activate manhuagui
 
 Help :
 
-    usage: python main.py [-h] -i COMIC_ID [--include-volume [INCLUDE_VOLUME]] [--include-extra [INCLUDE_EXTRA]] [--include-episode [INCLUDE_EPISODE]] [--include-undefined [INCLUDE_UNDEFINED]]  
-
-    Manhuagui Comic Downloader
+    usage: main.py download [-h] -i COMIC_ID [--include-volume [INCLUDE_VOLUME]] [--include-extra [INCLUDE_EXTRA]] [--include-episode [INCLUDE_EPISODE]] [--include-undefined [INCLUDE_UNDEFINED]] [--export-to-epub [EXPORT_TO_EPUB]] [--use-sample [USE_SAMPLE]]
 
     options:
     -h, --help            show this help message and exit
@@ -35,11 +33,15 @@ Help :
     --include-episode [INCLUDE_EPISODE]
                             Download Episode
     --include-undefined [INCLUDE_UNDEFINED]
-                            Download Undefined Type 
+                            Download Undefined Type
+    --export-to-epub [EXPORT_TO_EPUB]
+                            Export to Epub
+    --use-sample [USE_SAMPLE]
+                            Use Jigokuraku Sample to download , Currently , i on test about Ebook Export , so no need call to manhuagui.
 
 
 ```bash
-python main.py -i [comic_id] --include-volume
+python main.py download -i [comic_id] --include-volume
 ```
 
 Note : 
@@ -55,6 +57,10 @@ Note :
     there no need to download EPISODE anymore
     this is what i thinking
 
+
+## Dependencies
+
+- 
 
 ## LICENSE
 
@@ -76,4 +82,9 @@ MIT
 
     Project : manhuagui.py https://github.com/chazeon/manhuagui.py
     as above project , forked from this repository
+
+.
+
+    Project : EpubLib https://github.com/aerkalov/ebooklib
+    to generate epub from downloaded images
 

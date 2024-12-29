@@ -1,79 +1,29 @@
-
-import sys
 import argparse
+import sys
+import cli.download as download_cli
+import cli.ebook_merger as ebook_merger_cli
 
-from mhg.comic import Comic, Chapter
-from mhg.chapter_type import CHAPTER_TYPE
-import datetime
+def main(args):
+    parser = argparse.ArgumentParser()
 
-def main():
-    parser = argparse.ArgumentParser(
-        prog='python main.py',
-        description="Manhuagui Comic Downloader",
-    )
+    sub_parser = parser.add_subparsers(dest='command')
 
-    parser.add_argument(
-        '-i', '--comic-id',
-          type=str,
-          required=True, 
-          help='manhuagui comic id',
-    )
-    parser.add_argument(
-        '--include-volume', 
-        help='Download Volume ',
-        type=bool,
-        nargs='?',
-        const=True,
-        default=False,
-    )
-    parser.add_argument(
-        '--include-extra', 
-        help='Download Extra ',
-        type=bool,
-        nargs='?',
-        const=True,
-        default=False,
-    )
-    parser.add_argument(
-        '--include-episode', 
-        help='Download Episode ',
-        type=bool,
-        nargs='?',
-        const=True,
-        default=False,
-    )
-    parser.add_argument(
-        '--include-undefined', 
-        help='Download Undefined Type ',
-        type=bool,
-        nargs='?',
-        const=True,
-        default=False,
-    )
+    download_parser = sub_parser.add_parser('download')
+    download_cli._init_parser(download_parser)
+
+    # ebook_merger_parser = sub_parser.add_parser('ebook-merger')
+    # ebook_merger_cli._init_parser(ebook_merger_parser)
 
     opts = parser.parse_args()
-    
-    comic = Comic(opts)
-    comic.retrieve()
 
 
-    # comic.comic_name = 'Hello world'
-    # chapter = Chapter(
-    #     comic=comic,
-    #     name='Chapter 1',
-    #     type=CHAPTER_TYPE.VOLUME,
-    #     page_count=10,
-    #     url='https://tw.manhuagui.com/comic/27739/529325.html'
-    # )
-    # chapter.retrieve()
+    sub_args = args[1:]
+    if opts.command == 'download':
+        download_cli.main(sub_args)
+    # elif opts.command == 'ebook-merger':
+    #     ebook_merger_cli.main(sub_args)
+    else: 
+        parser.print_help()
 
 if __name__ == '__main__':
-    start_time = datetime.datetime.now()
-    print('Start at : ', str(start_time))
-
-    main()
-    
-    end_time = datetime.datetime.now()
-    print("End at : ", str(end_time))
-    print("Elapsed : ", str(end_time - start_time))
-    
+    main(sys.argv[1:])
