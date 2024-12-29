@@ -64,6 +64,13 @@ def _init_parser(parser):
         default=False,
     )
 
+    parser.add_argument(
+        '--start-from', 
+        help='Start From Chapters',
+        type=int,
+        default=1
+    )
+
 
 def main(args):
     parser = argparse.ArgumentParser(

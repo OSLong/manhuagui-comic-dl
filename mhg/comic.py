@@ -53,6 +53,13 @@ class Comic():
             for chapter in chapters
             if chapter.chapter_type in included_types
         ]
+
+        if opts.start_from:
+            chapters = [
+                chapter
+                for chapter in chapters
+                if chapter.chapter_number >= int(opts.start_from)
+            ]
         # print("Chapter after filter", chapters)
         return chapters
 
@@ -172,6 +179,12 @@ class Chapter():
         self.chapter_type_raw = chapter_type_raw
         self.url = url
         self.page_count = page_count
+
+    @property
+    def chapter_number(self):
+        chapter_name = self.name
+        result = re.search(r"\d+", chapter_name)
+        return int(result[0]) if result else 0
 
 
     def __str__(self):
