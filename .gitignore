@@ -244,3 +244,6 @@ $RECYCLE.BIN/
 data/
 caches/
 .vscode
+
+# just my custom testing code
+/mytest

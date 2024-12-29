@@ -1,0 +1,9 @@
+.columns {
+    height: 100%;
+    width: 1fr;
+    border: solid green;
+}
+
+.text-center {
+    align: center middle;
+}

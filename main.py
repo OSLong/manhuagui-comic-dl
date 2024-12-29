@@ -11,8 +11,8 @@ def main(args):
     download_parser = sub_parser.add_parser('download')
     download_cli._init_parser(download_parser)
 
-    # ebook_merger_parser = sub_parser.add_parser('ebook-merger')
-    # ebook_merger_cli._init_parser(ebook_merger_parser)
+    ebook_merger_parser = sub_parser.add_parser('ebook-merger')
+    ebook_merger_cli._init_parser(ebook_merger_parser)
 
     opts = parser.parse_args()
 
@@ -20,8 +20,8 @@ def main(args):
     sub_args = args[1:]
     if opts.command == 'download':
         download_cli.main(sub_args)
-    # elif opts.command == 'ebook-merger':
-    #     ebook_merger_cli.main(sub_args)
+    elif opts.command == 'ebook-merger':
+        ebook_merger_cli.main(sub_args)
     else: 
         parser.print_help()
 
