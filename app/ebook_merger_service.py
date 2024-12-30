@@ -39,6 +39,9 @@ class EbookMergerService():
             ]
         return result
 
+    def _merge_epub_files(self, file_paths):
+        pass
+
 
 if __name__ == '__main__':
     # print('dpackgae' ,)

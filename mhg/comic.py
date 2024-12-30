@@ -366,6 +366,8 @@ class Chapter():
             raw_html = self._request_chapter_page_html()
             chapter_info = self._extract_info_from_html(raw_html=raw_html)
             self._cache_chapter_detail_info(chapter_info)
+            # After request from internet , delay it
+            self._sleep()
 
         for image_name in chapter_info.get('files'):
             image_file_path = self._build_image_file_name(
@@ -452,18 +454,33 @@ class Chapter():
       
         page_links = []
         epub_spines = []
+
+        to_add_page = []
+        to_add_image = []
+
+        split_by_image = self.comic.opts.split_by_image
+
+        page = False
         for index, image_file_path in enumerate(image_file_paths):
             page_number = str(index + 1).rjust(4, '0')
             image_file_name = os.path.basename(image_file_path)
 
             epub_internal_image_path = f'static/{image_file_name}'
           
-
-            page = epub.EpubHtml(title=page_number, file_name=f"{page_number}.xhtml", )
-            page.content = (
-                # f'<h1>{page_number} / {chapter_info["len"]}</h1>'
-                f'<img src="{epub_internal_image_path}" width="100%">'
-            )
+            if not page or split_by_image:
+                page = epub.EpubHtml(title=page_number, file_name=f"{page_number}.xhtml", )
+                page.content = (
+                    # f'<p>{page_number} / {chapter_info["len"]}</h1>'
+                    f'<img src="{epub_internal_image_path}" width="100%">'
+                )
+                page_links += [
+                    epub.Link(
+                        href=f'{page_number}.xhtml',
+                        title=f'{page_number} / {chapter_info["len"]}',
+                        uid=page_number
+                    )
+                ]
+                to_add_page += [page]
 
             image_content = open(image_file_path, 'rb').read()
             image = epub.EpubImage(
@@ -471,21 +488,18 @@ class Chapter():
                 file_name=epub_internal_image_path,
                 content=image_content
             )
+            to_add_image += [image]
 
             if index == 0:
                 ebook.set_cover('static/cover', image_content, False)
 
-            page_links += [
-                epub.Link(
-                    href=f'{page_number}.xhtml',
-                    title=f'{page_number} / {chapter_info["len"]}',
-                    uid=page_number
-                )
-            ]
 
+
+        for page in to_add_page:
             epub_spines += [page]
-
             ebook.add_item(page)
+
+        for image in to_add_image:
             ebook.add_item(image)
 
 

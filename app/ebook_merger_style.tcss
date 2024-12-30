@@ -7,3 +7,9 @@
 .text-center {
     align: center middle;
 }
+
+.merge-container {
+	align: right middle;
+	height: 5;
+	padding: 1;
+}

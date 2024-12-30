@@ -247,3 +247,5 @@ caches/
 
 # just my custom testing code
 /mytest
+/textual.log
+.idea
