@@ -71,6 +71,15 @@ def _init_parser(parser):
         default=1
     )
 
+    parser.add_argument(
+        '--split-page-by-image', 
+        help='Split Page by Image',
+        type=bool,
+        default=False,
+        nargs="?",
+        const=True
+    )
+
 
 def main(args):
     parser = argparse.ArgumentParser(

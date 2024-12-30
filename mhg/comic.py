@@ -451,55 +451,103 @@ class Chapter():
 
         ebook.add_author(comic.comic_author)
 
-      
-        page_links = []
-        epub_spines = []
+        if image_file_paths:
+            cover_image_path = image_file_paths[0]
+            image_content = open(cover_image_path, 'rb').read()
+            ebook.set_cover('static/cover', image_content, False)
 
-        to_add_page = []
-        to_add_image = []
+        to_added_pages, to_added_images = [], []
 
-        split_by_image = self.comic.opts.split_by_image
+        split_page_by_image = self.comic.opts.split_page_by_image
 
-        page = False
-        for index, image_file_path in enumerate(image_file_paths):
-            page_number = str(index + 1).rjust(4, '0')
-            image_file_name = os.path.basename(image_file_path)
+        def _use_options_split_page_by_image(image_file_paths):
+            _to_added_pages = []
+            _to_added_images = []
+            for index, image_file_path in enumerate(image_file_paths):
+                page_number = str(index + 1).rjust(4, '0')
+                image_file_name = os.path.basename(image_file_path)
 
-            epub_internal_image_path = f'static/{image_file_name}'
-          
-            if not page or split_by_image:
-                page = epub.EpubHtml(title=page_number, file_name=f"{page_number}.xhtml", )
-                page.content = (
-                    # f'<p>{page_number} / {chapter_info["len"]}</h1>'
-                    f'<img src="{epub_internal_image_path}" width="100%">'
+                epub_internal_image_path = f'static/{image_file_name}'
+            
+                
+                page_uid = f'{self.name} - {page_number}'
+                page = epub.EpubHtml(title=page_number, uid=page_uid, file_name=f"{page_number}.xhtml", content='' )
+                page.content += (
+                    f'<figure>'
+                        f'<img src="{epub_internal_image_path}" width="100%" height="auto" style="object-fit: contain">'
+                        f'<figcaption{page_number} / {chapter_info["len"]}</figcaption>'
+                    " </figure>"
                 )
-                page_links += [
-                    epub.Link(
-                        href=f'{page_number}.xhtml',
-                        title=f'{page_number} / {chapter_info["len"]}',
-                        uid=page_number
-                    )
-                ]
-                to_add_page += [page]
+                
 
-            image_content = open(image_file_path, 'rb').read()
-            image = epub.EpubImage(
-                uid=image_file_name,
-                file_name=epub_internal_image_path,
-                content=image_content
+                image_content = open(image_file_path, 'rb').read()
+                image = epub.EpubImage(
+                    uid=image_file_name,
+                    file_name=epub_internal_image_path,
+                    content=image_content
+                )
+                _to_added_images += [image]
+                _to_added_pages += [page]
+
+            return _to_added_pages, _to_added_images
+
+        def _use_options_no_split_page(image_file_paths):
+            _to_added_images = []
+
+            page_uid = f'{self.name} - content'
+            page = epub.EpubHtml(title='Content', uid=page_uid, file_name=f"Content.xhtml", content='' )
+            
+
+            for index, image_file_path in enumerate(image_file_paths):
+                page_number = str(index + 1).rjust(4, '0')
+                image_file_name = os.path.basename(image_file_path)
+
+                epub_internal_image_path = f'static/{image_file_name}'
+            
+                # if not page or split_by_image:
+                page.content += (
+                    f'<figure>'
+                        f'<img src="{epub_internal_image_path}" width="100%" height="auto" style="object-fit: contain">'
+                        f'<figcaption>{page_number} / {chapter_info["len"]}</figcaption>'
+                    " </figure>"
+                )
+
+                image_content = open(image_file_path, 'rb').read()
+                image = epub.EpubImage(
+                    uid=image_file_name,
+                    file_name=epub_internal_image_path,
+                    content=image_content
+                )
+
+                _to_added_images += [image]
+
+            return [page], _to_added_images
+
+        
+        if split_page_by_image:
+            to_added_pages, to_added_images = _use_options_split_page_by_image(image_file_paths)
+        else:
+            to_added_pages, to_added_images = _use_options_no_split_page(image_file_paths)
+        
+        page_links = [
+            epub.Link(
+                href=page.file_name,
+                uid=page.id,
+                title=page.title
             )
-            to_add_image += [image]
+            for page in to_added_pages
+        ]
+        epub_spines = [
+            page
+            for page in to_added_pages
+        ]
 
-            if index == 0:
-                ebook.set_cover('static/cover', image_content, False)
 
-
-
-        for page in to_add_page:
+        for page in to_added_pages:
             epub_spines += [page]
             ebook.add_item(page)
 
-        for image in to_add_image:
+        for image in to_added_images:
             ebook.add_item(image)
 
 
@@ -520,29 +568,6 @@ class Chapter():
         # # )
 
         
-
-        # # add chapter
-        # ebook.add_item(c1)
-        # add image
-        # book.add_item(img)
-
-
-        # ebook.toc = (
-        #     epub.Link("chap_01.xhtml", "Introduction", "intro"),
-        #     (epub.Section("Simple book"), (c1,)),
-        # )
-        # ebook.toc = (
-        #     # epub.Section(self.comic.comic_name),
-        #     (epub.Section("HellO Wrold"), ( page, ) )
-        # )
-        # ebook.toc = (
-        #     epub.Section(self.name), page_links
-        # )
-        # ebook.toc = [[*page_links]]
-        # ebook.toc = (
-        #     epub.Link('0001.xhtml', 'Test', 'test'),
-        #     # (epub.Section('First Section'), )
-        # )
         ebook.toc = (
             epub.Section(self.comic.comic_name),
             (
@@ -556,9 +581,7 @@ class Chapter():
         
         ebook.spine = ['nav', ] + epub_spines 
 
- 
 
-        # print("view ", page_links,  epub_spines)   
 
         return ebook
         
