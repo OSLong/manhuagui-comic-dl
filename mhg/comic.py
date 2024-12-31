@@ -1,3 +1,4 @@
+import urllib.parse
 import ebooklib.epub
 import requests
 from bs4 import BeautifulSoup
@@ -11,7 +12,7 @@ import time
 import random
 import typing
 import ebooklib
-
+import urllib
 
 class Comic():
 
@@ -467,6 +468,11 @@ class Chapter():
                 page_number = str(index + 1).rjust(4, '0')
                 image_file_name = os.path.basename(image_file_path)
 
+                # In case that in image url use encode uri component like : %20 = ' '
+                # i decode it to normal name first 
+                # 
+                image_file_name = urllib.parse.unquote(image_file_name)
+
                 epub_internal_image_path = f'static/{image_file_name}'
             
                 
@@ -501,6 +507,11 @@ class Chapter():
             for index, image_file_path in enumerate(image_file_paths):
                 page_number = str(index + 1).rjust(4, '0')
                 image_file_name = os.path.basename(image_file_path)
+
+                # In case that in image url use encode uri component like : %20 = ' '
+                # i decode it to normal name first 
+                # 
+                image_file_name = urllib.parse.unquote(image_file_name)
 
                 epub_internal_image_path = f'static/{image_file_name}'
             

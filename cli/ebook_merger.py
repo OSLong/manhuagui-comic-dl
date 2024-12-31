@@ -11,6 +11,12 @@ def _init_parser(parser: argparse.ArgumentParser):
         required=True,
         type=str
     )
+    parser.add_argument(
+        '-od', '--output-dir', 
+        help='Epub Directory',
+        default='./',
+        type=str
+    )
     pass
 
 def main(args):

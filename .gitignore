@@ -249,3 +249,7 @@ caches/
 /mytest
 /textual.log
 .idea
+
+# My Test file
+/*.epub
+/*.zip

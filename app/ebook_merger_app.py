@@ -9,6 +9,7 @@ from textual.message import Message
 from .ebook_merger_service import EbookMergerService
 import sys
 import traceback
+import os
 
 class EpubToSelectItemWidget(Widget):
     # epub_item = reactive({})
@@ -118,6 +119,8 @@ class EbookMergerApp(App):
     all_keys = reactive([], recompose=True)
     selected_keys = reactive([], recompose=True)
 
+    export_book_name = reactive("")
+
     def __init__(self, opts, *args, **kwargs):
         res = super(EbookMergerApp, self).__init__(*args, **kwargs)
         self.opts = opts
@@ -142,10 +145,10 @@ class EbookMergerApp(App):
                 to_swap = len(self.selected_keys) - 1
 
             self.selected_keys[index], self.selected_keys[to_swap] = self.selected_keys[to_swap], self.selected_keys[index]
-            # self.mutate_reactive(EbookMergerApp.selected_keys)
+            self.mutate_reactive(EbookMergerApp.selected_keys)
         if event.type == 'remove':
             self.selected_keys.pop(index)
-            # self.mutate_reactive(EbookMergerApp.selected_keys)
+            self.mutate_reactive(EbookMergerApp.selected_keys)
 
     def _fatal_error(self) -> None:
         log("Got Error =====================", traceback.format_exc())
@@ -175,8 +178,8 @@ class EbookMergerApp(App):
             for epub_item in epub_files
         ]
         self.selected_keys = self.all_keys[1: 3]
-        # self.mutate_reactive(EbookMergerApp.all_keys)
-
+        self.mutate_reactive(EbookMergerApp.all_keys)
+     
         pass
 
     # EPubToSelectItemWidget
@@ -192,14 +195,12 @@ class EbookMergerApp(App):
         # log("MErge Query ", merge_name_input)
 
         selected_keys = self.selected_keys
-        if selected_keys:
-            merge_name_input = self.query_one("#merge-input-file-name")
+        if selected_keys and not self.export_book_name:
 
             first_key = selected_keys[0]
             epub_item = self.data[first_key]
-            log("MErge Query ", dir(merge_name_input))
 
-            merge_name_input.value = epub_item.get('name')
+            self.export_book_name = epub_item.get('name')
             # merge_name_input.
 
     def compose(self) -> ComposeResult:
@@ -255,6 +256,7 @@ class EbookMergerApp(App):
 
         yield Horizontal(
             Input(
+                value=self.export_book_name,
                 placeholder='Merge File Name',
                 id='merge-input-file-name',
                 classes='merge-input-file-name'
@@ -270,17 +272,37 @@ class EbookMergerApp(App):
         yield Footer()
 
     def _action_merged(self):
-        log("merged ", self.selected_keys)
+        
         to_merged_epub_files = [
             self.data[key]['path']
             for key in self.selected_keys
         ]
+        output_dir = self.opts.output_dir
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        output_path = f'{output_dir}/{self.export_book_name}.epub'
+
+        self.service._merge_epub_files(output_path, to_merged_epub_files)
+
+        # close after finished
+        sys.exit(0)
+
+
+    def on_input_changed(self, event: Input.Changed):
+        inp = event.input
+        if inp.id == 'merge-input-file-name':
+            self.export_book_name = inp.value 
+
 
     def on_button_pressed(self, event: Button.Pressed):
         button = event.button
         log("Spp Buton lick ", button)
         if button.id == 'button_merged':
+            button.disabled = True
+            button.loading = True
             self._action_merged()
+            
 
 # if __name__ == '__main__':
 #     start_time = datetime.datetime.now()
