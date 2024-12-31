@@ -1,7 +1,7 @@
 import datetime
 from textual import log
 from textual.app import App, ComposeResult
-from textual.widgets import Footer, Header, ListView, Button, Static, ListItem, Label
+from textual.widgets import Footer, Header, ListView, Button, Static, ListItem, Label, Input
 from textual.containers import Horizontal, Vertical, HorizontalGroup
 from textual.reactive import reactive
 from textual.widget import Widget
@@ -42,6 +42,7 @@ class EpubToSelectItemWidget(Widget):
         item = self.epub_item
         yield Horizontal(
             Label(item.get('name')),
+            Label(item.get('sequence')),
             Button(">>")
         )
 
@@ -141,10 +142,10 @@ class EbookMergerApp(App):
                 to_swap = len(self.selected_keys) - 1
 
             self.selected_keys[index], self.selected_keys[to_swap] = self.selected_keys[to_swap], self.selected_keys[index]
-            self.mutate_reactive(EbookMergerApp.selected_keys)
+            # self.mutate_reactive(EbookMergerApp.selected_keys)
         if event.type == 'remove':
             self.selected_keys.pop(index)
-            self.mutate_reactive(EbookMergerApp.selected_keys)
+            # self.mutate_reactive(EbookMergerApp.selected_keys)
 
     def _fatal_error(self) -> None:
         log("Got Error =====================", traceback.format_exc())
@@ -164,7 +165,7 @@ class EbookMergerApp(App):
         # try:
 
         epub_files = self.service._list_epub_in_directory()
-        epub_files.sort(key=lambda epub_item:  self._get_key_from_epub_item(epub_item))
+        # epub_files.sort(key=lambda epub_item:  self._get_key_from_epub_item(epub_item))
         self.data = {
             item.get('name'): item
             for item in epub_files
@@ -174,7 +175,7 @@ class EbookMergerApp(App):
             for epub_item in epub_files
         ]
         self.selected_keys = self.all_keys[1: 3]
-        self.mutate_reactive(EbookMergerApp.all_keys)
+        # self.mutate_reactive(EbookMergerApp.all_keys)
 
         pass
 
@@ -182,11 +183,29 @@ class EbookMergerApp(App):
     def on_epub_to_select_item_widget_selected(self, event: EpubToSelectItemWidget.Selected):
         selected_epub_item = self._get_key_from_epub_item(event.selected_epub_item)
         self.selected_keys += [selected_epub_item]
+        # self.recompose()
         self.mutate_reactive(EbookMergerApp.selected_keys)
+
+    def watch_selected_keys(self):
+        log("Watch on Selected Key ", self.selected_keys)
+        # if self.selected_keys:
+        # log("MErge Query ", merge_name_input)
+
+        selected_keys = self.selected_keys
+        if selected_keys:
+            merge_name_input = self.query_one("#merge-input-file-name")
+
+            first_key = selected_keys[0]
+            epub_item = self.data[first_key]
+            log("MErge Query ", dir(merge_name_input))
+
+            merge_name_input.value = epub_item.get('name')
+            # merge_name_input.
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
-
+        log("View Al l KEy ", self.data)
+        log("View Al l eky s ", self.all_keys)
 
         unselected_keys = [
             key
@@ -199,12 +218,6 @@ class EbookMergerApp(App):
             )
             for key in unselected_keys
         ]
-
-        log('Selecte Items ', self.selected_keys)
-
-        log("Uns eelte item ", unselected_keys)
-
-        log("Data ", self.data)
 
         selected_list_items_widget = [
             ListItem(
@@ -241,6 +254,11 @@ class EbookMergerApp(App):
         )
 
         yield Horizontal(
+            Input(
+                placeholder='Merge File Name',
+                id='merge-input-file-name',
+                classes='merge-input-file-name'
+            ),
             Button(
                 "Merge",
                 classes='button-merged',

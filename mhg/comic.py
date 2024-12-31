@@ -327,7 +327,7 @@ class Chapter():
 
         # patch_send()
 
-        print('    - Start download image : ', self.name , f' Total: ( {chapter_info['len']} )', ' -- ', download_url)
+        print('    - Start download image : ', self.name , f' Total: ( {chapter_info["len"]} )', ' -- ', download_url)
         params={
             # 'cid': chapter_info['cid'],
             # 'md5': chapter_info['sl']['m'],

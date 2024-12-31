@@ -1,10 +1,18 @@
 from glob import glob
 from textual import log
 import os
+import re
 
 class EbookMergerService():
     def __init__(self, opts):
         self.opts = opts
+
+    def _extract_number_from_name(self, name):
+        pattern = r'(\d+)'
+        matched = re.findall(pattern, name)
+        if matched:
+            return matched[-1]
+        return str(99999)
 
     def _list_epub_in_directory(self):
         
@@ -30,13 +38,26 @@ class EbookMergerService():
         log("Found epub fiel si s", epub_files, directory, pattern)
         
         result  = []
+
         for file_path in epub_files:
+            file_name = os.path.basename(file_path)
+            sequence = self._extract_number_from_name(file_name)
             result += [
                 {
+                    'sequence': sequence,
                     'path': file_path,
-                    'name': os.path.basename(file_path)
+                    'name': file_name
                 }
             ]
+        #
+        # result.sort(
+        #     key=lambda item: item.get('sequence')
+        # )
+
+        result = sorted(
+            result,
+            key=lambda item: int(item.get('sequence'))
+        )
         return result
 
     def _merge_epub_files(self, file_paths):
@@ -59,8 +80,4 @@ if __name__ == '__main__':
 
     service = EbookMergerService(opts=opts)
 
-    print(f"""
-view serchfiel 
-          ==============
-          {service._list_epub_in_directory()}
-        """)
+

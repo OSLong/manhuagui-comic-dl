@@ -13,3 +13,7 @@
 	height: 5;
 	padding: 1;
 }
+
+.merge-input-file-name {
+	width: 1fr;
+}
