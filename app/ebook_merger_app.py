@@ -177,7 +177,7 @@ class EbookMergerApp(App):
             self._get_key_from_epub_item(epub_item)
             for epub_item in epub_files
         ]
-        self.selected_keys = self.all_keys[1: 3]
+        self.selected_keys = []
         self.mutate_reactive(EbookMergerApp.all_keys)
      
         pass

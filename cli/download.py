@@ -68,7 +68,7 @@ def _init_parser(parser):
         '--start-from', 
         help='Start From Chapters',
         type=int,
-        default=1
+        default=False
     )
 
     parser.add_argument(

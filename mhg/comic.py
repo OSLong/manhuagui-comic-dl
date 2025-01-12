@@ -154,7 +154,7 @@ class Comic():
                         'href': chapter_element['href']
                     }
               
-                    enum_chapter_type = CHAPTER_TYPE._get_chapter_type_from_chinese(chapter_type)
+                    enum_chapter_type = CHAPTER_TYPE._get_chapter_type_from_chinese(chapter_type)                    
                     name = chapter_element['title']
                     count = chapter_element.find('i').get_text()[:-1]
                     chapter = Chapter(
