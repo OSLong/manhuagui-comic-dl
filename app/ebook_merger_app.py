@@ -35,6 +35,11 @@ class EpubToSelectItemWidget(Widget):
             super(EpubToSelectItemWidget.Selected, self).__init__()
             self.selected_epub_item = selected_epub_item
 
+    class Archived(Message):
+        def __init__(self, archived_epub_item):
+            super(EpubToSelectItemWidget.Archived, self).__init__()
+            self.archived_epub_item = archived_epub_item
+
     def __init__(self, epub_item,):
         super().__init__()
         self.epub_item = epub_item
@@ -44,11 +49,18 @@ class EpubToSelectItemWidget(Widget):
         yield Horizontal(
             Label(item.get('name')),
             Label(item.get('sequence')),
-            Button(">>")
+            Button(">>", id='button_transfer'),
+            Button("Archive", id='button_archive'),
         )
 
-    def on_button_pressed(self, event):
-        self.post_message(self.Selected(self.epub_item))
+    def on_button_pressed(self, event: Button.Pressed):
+        button = event.button
+        if button.id == 'button_transfer':
+            self.post_message(self.Selected(self.epub_item))
+        
+        if button.id == 'button_archive':
+            self.post_message(self.Archived(self.epub_item))
+
 
 class EpubSelectedItemWidget(Widget):
     # epub_item = reactive({})
@@ -119,6 +131,8 @@ class EbookMergerApp(App):
     all_keys = reactive([], recompose=True)
     selected_keys = reactive([], recompose=True)
 
+    archived_keys = reactive([], recompose=True)
+
     export_book_name = reactive("")
 
     def __init__(self, opts, *args, **kwargs):
@@ -178,6 +192,7 @@ class EbookMergerApp(App):
             for epub_item in epub_files
         ]
         self.selected_keys = []
+        self.archived_keys = []
         self.mutate_reactive(EbookMergerApp.all_keys)
      
         pass
@@ -188,6 +203,13 @@ class EbookMergerApp(App):
         self.selected_keys += [selected_epub_item]
         # self.recompose()
         self.mutate_reactive(EbookMergerApp.selected_keys)
+
+    # EPubToSelectItemWidget
+    def on_epub_to_select_item_widget_archived(self, event: EpubToSelectItemWidget.Archived):
+        selected_epub_item = self._get_key_from_epub_item(event.archived_epub_item)
+        self.archived_keys += [selected_epub_item]
+        # self.recompose()
+        self.mutate_reactive(EbookMergerApp.archived_keys)
 
     def watch_selected_keys(self):
         log("Watch on Selected Key ", self.selected_keys)
@@ -211,7 +233,7 @@ class EbookMergerApp(App):
         unselected_keys = [
             key
             for key in self.all_keys
-            if key not in self.selected_keys
+            if key not in (self.selected_keys + self.archived_keys)
         ]
         unselected_list_items_widget = [
             ListItem(
