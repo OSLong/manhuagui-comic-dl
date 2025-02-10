@@ -1,7 +1,7 @@
 import urllib.parse
 import ebooklib.epub
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, element as bs4_element
 from .chapter_type import CHAPTER_TYPE
 import re
 import lzstring
@@ -107,11 +107,30 @@ class Comic():
         session = self.session
         response = session.get(
             url=comic_detail_url,
-            headers=headers
+            headers=headers,
+            cookies={
+                'isAdult': '1'
+            }
         )
         print("  Finish Request Retrieve Comic Chapters : ", comic_id)
 
-        return response.content.decode('utf8', errors='ignore')
+        html_raw = response.content.decode('utf8', errors='ignore')
+
+        # When meet adult content
+        # 
+        if '__VIEWSTATE' in html_raw:
+            soup = BeautifulSoup(html_raw, 'html.parser')
+            chapter_encrypted = soup.find('input', {'id': '__VIEWSTATE'})
+            encrypted = chapter_encrypted.attrs['value']
+            html_chapters = lzstring.LZString.decompressFromBase64(encrypted)
+            html_chapters = BeautifulSoup(html_chapters, 'html.parser',)
+            
+            soup.find('div', {'class': 'chapter'}).append(html_chapters)
+            html_raw = str(soup)
+
+            
+        # open('sample1.html', 'w',errors='ignore').write(html_raw,)
+        return html_raw
     
     def _extract_chapters_from_html(self, html_raw):
         soup = BeautifulSoup(html_raw, 'html.parser')
@@ -133,9 +152,12 @@ class Comic():
         chapter_wrapper = soup.find('div', {'class': 'chapter'})
 
         result = []
-
+        # print("Chapter wrapper is ", chapter_wrapper)
         chapter_type = CHAPTER_TYPE.UNDEFINED
         for element in chapter_wrapper:
+
+            if type(element) is bs4_element.NavigableString:
+                continue
 
             is_chapter_type = element.name == 'h4'
             if is_chapter_type:
