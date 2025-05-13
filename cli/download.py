@@ -72,6 +72,13 @@ def _init_parser(parser):
     )
 
     parser.add_argument(
+        '--stop-at', 
+        help='Stop At Chapters',
+        type=int,
+        default=False
+    )
+
+    parser.add_argument(
         '--split-page-by-image', 
         help='Split Page by Image',
         type=bool,
