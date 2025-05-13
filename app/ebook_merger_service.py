@@ -6,7 +6,9 @@ import os
 import re
 import ebooklib
 from ebooklib.utils import parse_html_string
-import xml.etree.ElementTree as ET
+
+ebooklib.EXTENSIONS[ebooklib.ITEM_IMAGE] += ['.webp']
+ebooklib.EXTENSIONS[ebooklib.ITEM_COVER] += ['.webp']
 
 class EbookMergerService():
     def __init__(self, opts):
@@ -86,9 +88,12 @@ class EbookMergerService():
                 # and ebooklib define type by extension ,
                 # currently not include webp as image type yet
                 # 
+       
                 is_epub_type_image = item.get_type() in [ ebooklib.ITEM_IMAGE, ebooklib.ITEM_COVER ] 
-                is_media_type_image = 'image' in getattr(item, 'media_type', '')
-                if is_epub_type_image or is_media_type_image:
+                # ebooklib unknown type for extension "webp"
+                # is_media_type_image = 'image' in getattr(item, 'media_type', '')
+                if is_epub_type_image :
+                
                     old_path = item.file_name
                     new_path = f'{book_name}/{old_path}'
                     # new_path = urllib.parse.quote(new_path)
