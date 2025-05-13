@@ -253,3 +253,6 @@ caches/
 # My Test file
 /*.epub
 /*.zip
+
+/test*
+/happy_mh_cookie.txt

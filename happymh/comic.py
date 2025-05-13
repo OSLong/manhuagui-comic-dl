@@ -1,8 +1,6 @@
 import urllib.parse
 import ebooklib.epub
 import requests
-from bs4 import BeautifulSoup, element as bs4_element
-from .chapter_type import CHAPTER_TYPE
 import re
 import lzstring
 import STPyV8
@@ -13,81 +11,109 @@ import random
 import typing
 import ebooklib
 import urllib
+import bs4
+from collections import namedtuple
+from . import chapter_type
+# import cloudscraper
+
+Components = namedtuple(
+    typename='Components', 
+    field_names=['scheme', 'netloc', 'url', 'path', 'query', 'fragment']
+)
+
 
 class Comic():
 
-    def _get_manhuagui_host(self):
-        return 'https://www.manhuagui.com'
+    def _get_happymh_host(self):
+        return 'https://m.happymh.com'
     
     def _get_request_header_user_agent(self):
-        return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0'
+        return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0'
+        # return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0'
+
+    def _load_happy_mh_cookies(self):
+        cookie_file_path = './happy_mh_cookie.txt'
+        file = open(cookie_file_path, 'r+')
+        cookie_raw_text = file.read()
+        if not cookie_raw_text:
+            raise ValueError("Please set up cookie raw text for use Happy MH .")
+        
+        cookies = {}
+        for cookie in cookie_raw_text.split(';'):
+            key, val = cookie.split('=')
+            cookies[key] = val
+        return cookies
 
     def __init__(self, opts):
         self.opts = opts
         self.comic_name = None
+        self.comic_id = opts.comic_id
         pass
+
+    def _delay(self):
+        random_delay_times = [500, 1000]
+        to_delay = random.randrange(*random_delay_times) / 1000
+        print(f"- Delay : {to_delay}")
+        time.sleep(to_delay)
 
     session = requests.session()
 
     def _filtered_download_chapters(self, chapters):
         opts = self.opts
 
-        # is_no_episode = opts.no_episode
-        #  
-        is_include_extra = opts.include_extra 
-        is_include_episode = opts.include_episode
-        is_include_volume = opts.include_volume
-        is_include_undefined = opts.include_undefined
-
-        included_types = []
-        if is_include_episode:
-            included_types += [CHAPTER_TYPE.EPISODE]
-        if is_include_extra:
-            included_types += [CHAPTER_TYPE.EXTRA]
-        if is_include_volume:
-            included_types += [CHAPTER_TYPE.VOLUME]
-        if is_include_undefined:
-            included_types += [CHAPTER_TYPE.UNDEFINED]
-
-        chapters = [
-            chapter 
-            for chapter in chapters
-            if chapter.chapter_type in included_types
-        ]
 
         if opts.start_from:
             chapters = [
                 chapter
                 for chapter in chapters
-                if chapter.chapter_number >= int(opts.start_from)
+                if chapter.order >= int(opts.start_from)
             ]
 
         if opts.stop_at:
             chapters = [
                 chapter
                 for chapter in chapters
-                if chapter.chapter_number <= int(opts.stop_at)
+                if chapter.order <= int(opts.stop_at)
             ]
         # print("Chapter after filter", chapters)
         return chapters
+    
+    def _adapt_to_chapter_class(self, comic_info, chapter_info): 
+        return  Chapter(
+            comic=self,
+            name=chapter_info.get('chapterName'),
+            code=chapter_info.get('codes'),
+            order=chapter_info.get('order')
+        )
 
     def process(self):
         opts = self.opts
 
         comic_id = opts.comic_id
-        comic_detail_html = self._request_comic_detail_html(comic_id=comic_id)
-        chapters = self._extract_chapters_from_html(comic_detail_html)
 
+        comic_info_html_raw = self.request_comic_detail_html(comic_id)
+        comic_info = self._extract_comic_info_from_html(comic_info_html_raw)
+        print("Comic INfo : ", comic_info)
+
+        chapter_infos = self.request_comic_chapters(comic_id=comic_id, comic_info=comic_info)
+        
+        chapters = []
+        for chapter_info in chapter_infos:
+            chapter = self._adapt_to_chapter_class(comic_info=comic_info, chapter_info=chapter_info)
+            chapters += [chapter]
         chapters = self._filtered_download_chapters(chapters=chapters)
 
+
+        print("Chapter Now is : ", chapters)
+
         # For Testing
-        # chapters = chapters[0:1]
+        # chapters = chapters[1:2]
 
         for chapter in chapters:
             chapter.process()
             # chapter._sleep()
 
-        print("Finished Comic Download : ",self.comic_name)
+        # print("Finished Comic Download : ",self.comic_name)
         
         if opts.export_to_epub:
             for chapter in chapters:
@@ -95,182 +121,218 @@ class Comic():
             print("Finish Export EPUB FILE : ",self.comic_name)
 
     def _get_sample_comic_detail_html(self):
-        return open('./sample/jigokuraku.html', 'rb').read().decode('utf8', errors='ignore')
+        json_text = open('./sample/happymh_sample.json', 'rb').read().decode('utf8', errors='ignore')
+        return json.loads(json_text)
+    
+    
+    def _get_cache_dir(self):
+        return './caches'
+    
+    def _extract_comic_info_from_html(self, html_raw):
+        soup = bs4.BeautifulSoup(html_raw, 'html.parser')
+        title = soup.find('h2', {'class': 'mg-title'})
+        comic_id = soup.find('input', {'name': 'code'}).get('value')
+        self.comic_name = title.text
+        return {
+            'comic_id': comic_id,
+            'comic_title': title.text
+        }
+    
+    def _get_comic_cache_dir(self, comic_id):
+        CACHE_DIR = self._get_cache_dir()
 
-    def _request_comic_detail_html(self, comic_id: str):
+        comic_cache_dir = f'{CACHE_DIR}/{comic_id}'
+        return comic_cache_dir
+
+    def _get_comic_detail_html_from_cache_name(self, comic_id):
+        comic_cache_dir = self._get_comic_cache_dir(comic_id)
+        if not os.path.exists(comic_cache_dir):
+            os.makedirs(comic_cache_dir, exist_ok=True)
+        cache_name = f'{comic_cache_dir}/detail.html'
+        return cache_name
+
+    def request_comic_detail_html(self, comic_id):
+        cache_file_name = self._get_comic_detail_html_from_cache_name(comic_id=comic_id)
+        if os.path.exists(cache_file_name):
+            return open(cache_file_name, 'rb').read().decode(errors='ignore')
+    
+        host = self._get_happymh_host()
+        comic_detail_url = f'%(host)s/manga/%(comic_id)s' %{
+                'host': host,
+                'comic_id': comic_id,
+        }
+        headers = {
+            # 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0',
+
+            'user-agent': self._get_request_header_user_agent(),
+            # 'referer': host
+        }
+        cookies = self._load_happy_mh_cookies()
+        response = requests.get(
+            comic_detail_url,
+            headers=headers,
+            cookies=cookies
+        )
+        open(cache_file_name, 'wb').write(response.content)
+        html_raw = response.content.decode(errors='ignore')
+        return html_raw
+    
+    def request_comic_chapters(self, comic_id: str, comic_info):
         opts = self.opts
         if opts.use_sample:
             return self._get_sample_comic_detail_html()
         
-        print("- Start Request Retrieve Comic Chapters : ", comic_id)
-        host = self._get_manhuagui_host()
-        comic_detail_url = f'%(host)s/comic/%(comic_id)s' %{
-            'host': host,
-            'comic_id': comic_id
-        }
-        headers = {
-            'user-agent': self._get_request_header_user_agent()
-        }
         session = self.session
-        response = session.get(
-            url=comic_detail_url,
-            headers=headers,
-            cookies={
-                'isAdult': '1'
+ 
+        print("- Start Request Retrieve Comic Chapters : ", comic_id)
+        host = self._get_happymh_host()
+        next_page = 1
+        all_chapters = []
+        while next_page:
+            query_params = {
+                'code': comic_id, 
+                'page': next_page,
+                'lang': 'cn',
+                'order': 'desc'
             }
-        )
-        print("  Finish Request Retrieve Comic Chapters : ", comic_id)
+            comic_chapter_url = f'%(host)s/v2.0/apis/manga/chapterByPage' %{
+                'host': host,
+            }
+            headers = {
+                'user-agent': self._get_request_header_user_agent(),
+                'accept': 'application/json, text/plain, */*',
+                'accept-language': 'en-US,en;q=0.9',
+                'dnt': '1',
+                'priority': 'u=1, i',
+                'referer': 'https://m.happymh.com/',
+                'sec-ch-ua': '"Chromium";v="136", "Microsoft Edge";v="136", "Not.A/Brand";v="99"',
+                'sec-ch-ua-arch': 'x86',
+                'sec-ch-ua-bitness': '64',
+                'sec-ch-ua-full-version': '136.0.3240.64',
+                'sec-ch-ua-full-version-list': 'Chromium;v="136.0.7103.93", "Microsoft Edge";v="136.0.3240.64", "Not.A/Brand";v="99.0.0.0"',
+                'sec-ch-ua-mobile': '?0',
+                'sec-ch-ua-model': '',
+                'sec-ch-ua-platform': 'Windows',
+                'sec-ch-ua-platform-version': '15.0.0',
+                'sec-fetch-dest': 'empty',
+                'sec-fetch-mode': 'cors',
+                'sec-fetch-site': 'same-origin',
+                'x-requested-id': '1747150475680',
+                'x-requested-with': 'XMLHttpRequest'
+            }
+            cookies = self._load_happy_mh_cookies()
+            response = requests.get(
+                comic_chapter_url,
+                params=query_params,
+                headers=headers,
+                cookies=cookies
+            )
 
-        html_raw = response.content.decode('utf8', errors='ignore')
+            print("Response JSon is ", response.content)
+            response_json = json.loads(response.content)
 
-        # When meet adult content
-        # 
-        if '__VIEWSTATE' in html_raw:
-            soup = BeautifulSoup(html_raw, 'html.parser')
-            chapter_encrypted = soup.find('input', {'id': '__VIEWSTATE'})
-            encrypted = chapter_encrypted.attrs['value']
-            html_chapters = lzstring.LZString.decompressFromBase64(encrypted)
-            html_chapters = BeautifulSoup(html_chapters, 'html.parser',)
+            data = response_json.get('data')
+            chapters = data.get('items')
+            is_end = data.get('isEnd')
+
+            all_chapters += chapters
+            # break
             
-            soup.find('div', {'class': 'chapter'}).append(html_chapters)
-            html_raw = str(soup)
+            # session.cookies
+            next_page += 1
+            if is_end:
+                next_page = None 
+            self._delay()
 
-            
-        # open('sample1.html', 'w',errors='ignore').write(html_raw,)
-        return html_raw
+        return all_chapters
     
-    def _extract_chapters_from_html(self, html_raw):
-        soup = BeautifulSoup(html_raw, 'html.parser')
-
-        book_title_element = soup.find('div', {'class': 'book-title'}).find('h1')
-        self.comic_name = book_title_element.get_text()
-
-        book_author_element = soup.find_all(
-            lambda tag: 
-            tag.name == 'a' and 'author' in (tag.get('href') or '') 
-            #   'author' in (getattr(tag, 'href', '') or '')
-        )
-        author_name = 'Undefined'
-        if book_author_element:
-            author_name = book_author_element[0].get_text()
-        self.comic_author = author_name
-
-        
-        chapter_wrapper = soup.find('div', {'class': 'chapter'})
-
-        result = []
-        # print("Chapter wrapper is ", chapter_wrapper)
-        chapter_type = CHAPTER_TYPE.UNDEFINED
-        for element in chapter_wrapper:
-
-            if type(element) is bs4_element.NavigableString:
-                continue
-
-            is_chapter_type = element.name == 'h4'
-            if is_chapter_type:
-                chapter_type = element.get_text()
-                continue
-
-            element_class = element.get('class') or []
-
-            is_chapter_container = 'chapter-list' in element_class
-            if is_chapter_container:
-                chapters = element.select('li > a')
-                
-                for chapter_element in chapters:
-                    full_link = '%(host)s%(href)s' % {
-                        'host': self._get_manhuagui_host(),
-                        'href': chapter_element['href']
-                    }
-              
-                    enum_chapter_type = CHAPTER_TYPE._get_chapter_type_from_chinese(chapter_type)                    
-                    name = chapter_element['title']
-                    count = chapter_element.find('i').get_text()[:-1]
-                    chapter = Chapter(
-                        comic=self,
-                        name=name,
-                        page_count=count,
-                        chapter_type=enum_chapter_type,
-                        chapter_type_raw=chapter_type,
-                        url=full_link
-                    )
-                    result += [ chapter ]
-        return result
   
 
 # Save in same file , so i can use python typing 
 # if save different file , will have recursive import error
 # 
 class Chapter():
-    def __init__(self, comic: Comic, name, chapter_type, url, chapter_type_raw=None, page_count=None ):
+    def __init__(self, comic: Comic, name, code, order, page_count=None ):
         self.comic = comic
         self.name = name
-        self.chapter_type = chapter_type
-        self.chapter_type_raw = chapter_type_raw
-        self.url = url
+        self.chapter_type = chapter_type.CHAPTER_TYPE.EPISODE
+        # self.chapter_type_raw = chapter_type_raw
+        self.code = code
+        self.order = order
         self.page_count = page_count
 
-    @property
-    def chapter_number(self):
-        chapter_name = self.name
-        result = re.search(r"\d+", chapter_name)
-        return int(result[0]) if result else 0
-
-
+    
     def __str__(self):
         return json.dumps({
             'name': self.name,
-            'chapter_type_raw': self.chapter_type_raw,
-            'chapter_type': self.chapter_type.value,
-            'url': self.url,
-            'page_count': self.page_count
+            'code': self.code,
         })
     
     def __repr__(self):
         return str(self)
+     
     
-    def _request_chapter_page_html(self):
-        print("  - Start Request comic chapter detail : ", self.comic.comic_name, ' -- ',self.name)
+    def _request_chapter_page_data(self):
+        print("  - Start Request comic chapter detail : ", self.comic.comic_id, ' -- ',self.name)
         headers = {
-            'user-agent': self.comic._get_request_header_user_agent()
+            'user-agent': self.comic._get_request_header_user_agent(),
+            'accept': 'application/json, text/plain, */*',
+            'accept-language': 'en-US,en;q=0.9',
+            'dnt': '1',
+            'priority': 'u=1, i',
+            'referer': 'https://m.happymh.com/',
+            'sec-ch-ua': '"Chromium";v="136", "Microsoft Edge";v="136", "Not.A/Brand";v="99"',
+            'sec-ch-ua-arch': 'x86',
+            'sec-ch-ua-bitness': '64',
+            'sec-ch-ua-full-version': '136.0.3240.64',
+            'sec-ch-ua-full-version-list': 'Chromium;v="136.0.7103.93", "Microsoft Edge";v="136.0.3240.64", "Not.A/Brand";v="99.0.0.0"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-model': '',
+            'sec-ch-ua-platform': 'Windows',
+            'sec-ch-ua-platform-version': '15.0.0',
+            'sec-fetch-dest': 'empty',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': 'same-origin',
+            'x-requested-id': '1747150475680',
+            'x-requested-with': 'XMLHttpRequest'
         }
+        params = {
+            'code': self.code,
+            'v': 'v3.1818134'
+        }
+        host = self.comic._get_happymh_host()
         session = self.comic.session
+
+        # manga_read_url = f'{host}/mangaread/{self.code}'
+        # manga_read_response = session.get(
+        #     url=manga_read_url,
+        #     headers=headers,
+        #     params=params,
+        #     cookies=self.comic._load_happy_mh_cookies()
+        # )
+
+        url = f'{host}/v2.0/apis/manga/reading'
         response = session.get(
-            url=self.url,
-            headers=headers
+            url=url,
+            headers=headers,
+            params=params,
+            cookies=self.comic._load_happy_mh_cookies()
         )
         print("    Finish Request comic chapter detail : ", self.comic.comic_name, ' -- ',self.name)
 
-        return response.content.decode('utf8', errors='ignore')
-
-    def _extract_info_from_html(self, raw_html):
-        """
-        This function , i follow here : 
-            https://github.com/kimklai/manhuagui/blob/master/src/mhg.py#L127
-        """
-        raw_content = raw_html
-        res = re.search(
-            r'<script type="text\/javascript">window\["\\x65\\x76\\x61\\x6c"\](.*\)) <\/script>', raw_content).group(1)
-
-        lz_encoded = re.search(
-            r"'([A-Za-z0-9+/=]+)'\['\\x73\\x70\\x6c\\x69\\x63'\]\('\\x7c'\)", res).group(1)
-        lz_decoded = lzstring.LZString().decompressFromBase64(lz_encoded)
-        res = re.sub(r"'([A-Za-z0-9+/=]+)'\['\\x73\\x70\\x6c\\x69\\x63'\]\('\\x7c'\)",
-                     "'%s'.split('|')" % (lz_decoded), res)
+        json_response = json.loads(response.content.decode('utf8', errors='ignore'))
         
-        # code = node.get_node_output(res)
-        with STPyV8.JSContext() as ctx:
-            code = ctx.eval(res)
-        
-        pages_opts = json.loads(
-            re.search(r'^SMH.imgData\((.*)\)\.preInit\(\);$', code).group(1))
-        return pages_opts
+        success = json_response.get('status') == 0
+
+        if not success:
+            raise ValueError("==== Failed on ", self.name)
+        return json_response
     
     def _get_cache_dir(self):
         return './caches'
     
     def _get_chapter_cache_file_name(self):
-        comic_name = self.comic.comic_name
+        comic_name = self.comic.comic_id
         chapter_name = self.name
 
         cache_dir = self._get_cache_dir()
@@ -300,21 +362,11 @@ class Chapter():
         return result
     
     def _get_mhg_image_server(self):
-        return 'https://eu1.hamreus.com'
+        return self.comic._get_happymh_host()
 
     def _get_data_dir(self):
         return './data'
-    
 
-    def _build_image_download_url(self, chapter_info, image_name):
-        host = self._get_mhg_image_server()
-        path = chapter_info.get('path')
-        download_url = ''.join([
-            host,
-            path,
-            image_name
-        ])
-        return download_url
     
     def _get_data_image_dir(self):
         data_dir = self._get_data_dir()
@@ -325,14 +377,17 @@ class Chapter():
             'images',
         ])
 
-    def _build_image_file_name(self, chapter_info, image_name):
+    def _build_image_file_name(self, chapter_info, index, image_url):
         chapter_name = self.name
         
+        index_name = str(index).rjust(4, '0')
+        image_name = os.path.basename(image_url).split('?')[0]
+        name = '-'.join([index_name, image_name])
         image_file_path = '/'.join([
             self._get_data_image_dir(),
             self.chapter_type.value,
             chapter_name,
-            image_name
+            name
         ])
         return image_file_path
     
@@ -342,37 +397,40 @@ class Chapter():
     
 
     def _request_download_image(self, chapter_info, download_url):
-        """
-        This function i follow from : 
-                https://github.com/kimklai/manhuagui/blob/master/src/mhg.py#L254
-        """
-        # import http.client
-
-        # def patch_send():
-        #     old_send= http.client.HTTPConnection.send
-        #     def new_send( self, data ):
-        #         print(data.decode())
-        #         return old_send(self, data) #return is not necessary, but never hurts, in case the library is changed
-        #     http.client.HTTPConnection.send= new_send
-
-        # patch_send()
-
-        print('    - Start download image : ', self.name , f' Total: ( {chapter_info["len"]} )', ' -- ', download_url)
+        print('    - Start download image : ', self.name , f' Total: ( {self.page_count} )', ' -- ', download_url)
         params={
             # 'cid': chapter_info['cid'],
             # 'md5': chapter_info['sl']['m'],
-            'm': chapter_info['sl']['m'],
-            'e': chapter_info['sl']['e'],
+            # 'm': chapter_info['sl']['m'],
+            # 'e': chapter_info['sl']['e'],
         },
         headers={
-            'Referer': self.comic._get_manhuagui_host(),
-            'user-agent':self.comic._get_request_header_user_agent()
+            'user-agent':self.comic._get_request_header_user_agent(),
+            'accept': 'application/json, text/plain, */*',
+            'accept-language': 'en-US,en;q=0.9',
+            'dnt': '1',
+            'priority': 'u=1, i',
+            'referer': 'https://m.happymh.com/',
+            'sec-ch-ua': '"Chromium";v="136", "Microsoft Edge";v="136", "Not.A/Brand";v="99"',
+            'sec-ch-ua-arch': 'x86',
+            'sec-ch-ua-bitness': '64',
+            'sec-ch-ua-full-version': '136.0.3240.64',
+            'sec-ch-ua-full-version-list': 'Chromium;v="136.0.7103.93", "Microsoft Edge";v="136.0.3240.64", "Not.A/Brand";v="99.0.0.0"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-model': '',
+            'sec-ch-ua-platform': 'Windows',
+            'sec-ch-ua-platform-version': '15.0.0',
+            'sec-fetch-dest': 'empty',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': 'same-origin',
+            'x-requested-id': '1747150475680',
+            'x-requested-with': 'XMLHttpRequest'
         }
         session = self.comic.session
         response = session.get(
             url=download_url, 
             headers=headers,
-            params=params
+            cookies=self.comic._load_happy_mh_cookies()
         )
         # if response.status_code != 200:
         #     self._sleep()
@@ -392,17 +450,24 @@ class Chapter():
 
     def process(self):
         chapter_info = self._read_get_chapter_cache()
+        # chapter_info = False
         if not chapter_info:
-            raw_html = self._request_chapter_page_html()
-            chapter_info = self._extract_info_from_html(raw_html=raw_html)
+            chapter_info = self._request_chapter_page_data()
             self._cache_chapter_detail_info(chapter_info)
             # After request from internet , delay it
             self._sleep()
 
-        for image_name in chapter_info.get('files'):
+        data = chapter_info.get('data')
+        image_infos = data.get('scans')
+
+        self.page_count = len(image_infos)
+
+        for index , image_info in enumerate(image_infos):
+            image_url = image_info['url']
             image_file_path = self._build_image_file_name(
                 chapter_info=chapter_info,
-                image_name=image_name
+                index=index+1,
+                image_url=image_url,
             )
             if os.path.exists(image_file_path):
                 continue
@@ -411,10 +476,11 @@ class Chapter():
             if not os.path.exists(image_file_dir):
                 os.makedirs(image_file_dir)
             
-            image_download_url = self._build_image_download_url(
-                chapter_info=chapter_info,
-                image_name=image_name
-            )
+            # image_download_url = self._build_image_download_url(
+            #     chapter_info=chapter_info,
+            #     image_url=image_url
+            # )
+            image_download_url = image_url
 
             image_data = self._request_download_image(
                 chapter_info=chapter_info,
@@ -476,10 +542,10 @@ class Chapter():
             self.name
         ])
         ebook.set_title(title=title)
-        ebook.set_identifier('-'.join([str(chapter_info['cid']),str( chapter_info['bid'])]))
+        ebook.set_identifier('-'.join([str(self.name),str(self.comic.comic_id)]))
         ebook.set_language('cn')
 
-        ebook.add_author(comic.comic_author)
+        # ebook.add_author(comic.comic_author)
 
         if image_file_paths:
             cover_image_path = image_file_paths[0]
@@ -548,7 +614,7 @@ class Chapter():
                 page.content += (
                     f'<figure>'
                         f'<img src="{epub_internal_image_path}" width="100%" height="auto" style="object-fit: contain">'
-                        f'<figcaption>{page_number} / {chapter_info["len"]}</figcaption>'
+                        f'<figcaption>{page_number} / {self.page_count}</figcaption>'
                     " </figure>"
                 )
 
@@ -662,4 +728,4 @@ class Chapter():
         print('        Finish Build Epub :', self.name)
 
 
-        
+    

@@ -2,6 +2,7 @@ import argparse
 import sys
 import cli.download as download_cli
 import cli.ebook_merger as ebook_merger_cli
+import cli.happymh_download as happymh_cli
 
 def main(args):
     parser = argparse.ArgumentParser()
@@ -14,6 +15,9 @@ def main(args):
     ebook_merger_parser = sub_parser.add_parser('ebook-merger')
     ebook_merger_cli._init_parser(ebook_merger_parser)
 
+    happymh_parser = sub_parser.add_parser('happymh-download')
+    happymh_cli._init_parser(happymh_parser)
+
     opts = parser.parse_args()
 
 
@@ -22,6 +26,8 @@ def main(args):
         download_cli.main(sub_args)
     elif opts.command == 'ebook-merger':
         ebook_merger_cli.main(sub_args)
+    elif opts.command == 'happymh-download':
+        happymh_cli.main(sub_args)
     else: 
         parser.print_help()
 
