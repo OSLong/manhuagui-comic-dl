@@ -1,6 +1,7 @@
 import argparse
 import sys
-from app import ebook_merger_app
+# from app import ebook_merger_app
+from app import ebook_merger_app_v2
 from textual import log
 
 def _init_parser(parser: argparse.ArgumentParser):
@@ -24,7 +25,8 @@ def main(args):
     _init_parser(parser=parser)
     opts = parser.parse_args(args=args)
 
-    app = ebook_merger_app.EbookMergerApp(opts)
+    # app = ebook_merger_app.EbookMergerApp(opts)
+    app = ebook_merger_app_v2.EbookMergerAppV2(opts)
     app.run()
 
 
